@@ -53,7 +53,7 @@ Sistem manajemen pipeline penjualan dan tracking leads dari entry hingga signed 
 
 **Stack:** Google Sheets · AppScript · Python · SQLite · SQL  
 **Data:** 24 kolom · Pipeline funnel · Contract management · Follow-up scheduling  
-**Live Dashboard:** `[link web app]`
+**Live Dashboard:** `[https://rakaro-exp.github.io/portfolio_caraka/02-client-pipeline/]`
 
 ---
 
@@ -62,7 +62,7 @@ Sistem monitoring arus kas real-time dengan kategorisasi transaksi dan laporan k
 
 **Stack:** Google Sheets · AppScript · Python · SQLite · SQL  
 **Data:** 316 transaksi · Cash-in/out · Running balance · Multi payment method  
-**Live Dashboard:** `[link web app]`
+**Live Dashboard:** `[https://rakaro-exp.github.io/portfolio_caraka/04-cash-flow/]`
 
 ---
 
@@ -71,7 +71,7 @@ Sistem operasional penjualan dengan manajemen inventori, POS transaction, dan an
 
 **Stack:** Google Sheets · AppScript · Python · SQLite · SQL  
 **Data:** 104 transaksi · 100 SKU · Stockout tracking · Margin analysis  
-**Live Dashboard:** `[link web app]`
+**Live Dashboard:** `[[link web app](https://rakaro-exp.github.io/portfolio_caraka/09-revenue-ops/)]`
 
 ---
 
