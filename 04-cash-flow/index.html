@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Flow Monitoring & Financial Reporting — Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0f0a; --bg2:#111811; --bg3:#1a241a;
+  --border:#2a3a2a; --accent:#7aff9c; --accent2:#3dbbff;
+  --muted:#6b806b; --text:#e8f0e8; --text2:#a0b8a0;
+  --danger:#ff6b6b; --warn:#ffd166; --negative:#ff8c6b;
+  --mono:'DM Mono',monospace; --serif:'Fraunces',serif;
+  --sans:'DM Sans',sans-serif; --radius:10px; --tab-h:52px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-weight:300;min-height:100vh;line-height:1.6}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(10,15,10,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;height:var(--tab-h);gap:0}
+.topbar-brand{font-family:var(--serif);font-weight:600;font-size:1.05rem;color:var(--accent);white-space:nowrap;margin-right:32px}
+.topbar-brand span{color:var(--text2);font-weight:300;font-size:0.85rem;margin-left:6px}
+nav{display:flex;gap:2px;flex:1}
+.tab-btn{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:0.75rem;padding:6px 16px;border-radius:6px;cursor:pointer;letter-spacing:0.05em;transition:all 0.15s;white-space:nowrap}
+.tab-btn:hover{color:var(--text);background:var(--bg3)}
+.tab-btn.active{color:var(--accent);background:rgba(122,255,156,0.08)}
+.pipeline-badge{font-family:var(--mono);font-size:0.65rem;color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:20px;white-space:nowrap;margin-left:auto}
+.pipeline-badge .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.panel{display:none;padding:32px 28px;animation:fadeIn 0.2s ease}
+.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* Filter */
+.filter-bar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:5px}
+.filter-group label{font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase}
+.filter-group select,.filter-group input{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:0.75rem;padding:7px 10px;border-radius:6px;outline:none;min-width:130px}
+.filter-group select:focus,.filter-group input:focus{border-color:var(--accent)}
+.btn-apply{background:var(--accent);color:var(--bg);border:none;font-family:var(--mono);font-size:0.75rem;font-weight:500;padding:8px 18px;border-radius:6px;cursor:pointer;white-space:nowrap;align-self:flex-end;transition:opacity 0.15s}
+.btn-apply:hover{opacity:0.85}
+.btn-reset{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:0.75rem;padding:8px 14px;border-radius:6px;cursor:pointer;align-self:flex-end;transition:all 0.15s}
+.btn-reset:hover{border-color:var(--text2);color:var(--text2)}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:24px}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 16px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.kpi-card.blue::before{background:var(--accent2)}
+.kpi-card.warn::before{background:var(--warn)}
+.kpi-card.neg::before{background:var(--negative)}
+.kpi-card .kpi-label{font-family:var(--mono);font-size:0.62rem;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px}
+.kpi-card .kpi-value{font-family:var(--serif);font-size:1.5rem;font-weight:600;color:var(--text);line-height:1}
+.kpi-card .kpi-sub{font-family:var(--mono);font-size:0.62rem;color:var(--muted);margin-top:4px}
+.kpi-card .kpi-value.positive{color:var(--accent)}
+.kpi-card .kpi-value.negative{color:var(--negative)}
+/* Charts */
+.charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.chart-card h4{font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:16px}
+.chart-wrap{position:relative;height:200px}
+/* Tables */
+.tables-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.table-card-header h4{font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-family:var(--mono);font-size:0.65rem;color:var(--muted);text-align:left;padding:8px 16px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em}
+.tbl td{padding:8px 16px;font-size:0.78rem;border-bottom:1px solid rgba(42,58,42,0.5);color:var(--text2)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(122,255,156,0.03);color:var(--text)}
+.badge{display:inline-block;font-family:var(--mono);font-size:0.65rem;padding:2px 8px;border-radius:4px}
+.badge-in{background:rgba(122,255,156,0.12);color:var(--accent)}
+.badge-out{background:rgba(255,140,107,0.12);color:var(--negative)}
+/* SQL / Raw / Pipeline - same pattern */
+.sql-layout{display:grid;grid-template-columns:260px 1fr;gap:20px;height:calc(100vh - 120px)}
+.sql-sidebar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.sql-sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em}
+.query-list{flex:1;overflow-y:auto}
+.query-item{padding:10px 16px;cursor:pointer;border-bottom:1px solid rgba(42,58,42,0.5);transition:background 0.1s}
+.query-item:hover{background:var(--bg3)}
+.query-item.active{background:rgba(122,255,156,0.06);border-left:2px solid var(--accent)}
+.query-item .q-label{font-family:var(--mono);font-size:0.72rem;color:var(--text);margin-bottom:2px}
+.query-item .q-type{font-family:var(--mono);font-size:0.62rem;color:var(--muted)}
+.sql-main{display:flex;flex-direction:column;gap:16px}
+.sql-editor-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.sql-editor-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.7rem;color:var(--muted)}
+#sql-editor{width:100%;min-height:160px;resize:vertical;background:var(--bg2);border:none;color:var(--accent);font-family:var(--mono);font-size:0.8rem;padding:16px;outline:none;line-height:1.6}
+.btn-run{background:var(--accent);color:var(--bg);border:none;font-family:var(--mono);font-size:0.75rem;font-weight:500;padding:7px 16px;border-radius:5px;cursor:pointer}
+.btn-run:hover{opacity:0.85}
+.sql-result-wrap{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:auto}
+.sql-result-info{padding:10px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.68rem;color:var(--muted);display:flex;justify-content:space-between}
+.rawdata-controls{display:flex;gap:12px;margin-bottom:16px;align-items:center}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:0.78rem;padding:9px 14px;border-radius:6px;outline:none}
+.search-input:focus{border-color:var(--accent)}
+.rawdata-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:calc(100vh - 220px)}
+.rawdata-table-wrap table{min-width:1000px}
+.pagination{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-family:var(--mono);font-size:0.72rem;color:var(--muted)}
+.pg-btn{background:var(--bg2);border:1px solid var(--border);color:var(--text2);padding:5px 10px;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:0.7rem}
+.pg-btn:disabled{opacity:0.3;cursor:default}
+.pg-btn:not(:disabled):hover{border-color:var(--accent);color:var(--accent)}
+.pipeline-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.pipeline-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+.pipeline-card h3{font-family:var(--mono);font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px;font-family:var(--mono);font-size:0.73rem;color:var(--text2);line-height:1.8;overflow-x:auto;white-space:pre}
+.code-block .kw{color:var(--accent)} .code-block .str{color:var(--warn)} .code-block .cmt{color:var(--muted)}
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-item{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px;text-align:center}
+.stat-item .sv{font-family:var(--serif);font-size:1.3rem;color:var(--accent)}
+.stat-item .sk{font-family:var(--mono);font-size:0.62rem;color:var(--muted);margin-top:2px}
+.run-history{margin-top:14px}
+.run-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(42,58,42,0.5);font-family:var(--mono);font-size:0.72rem}
+.run-row:last-child{border-bottom:none}
+.run-status{color:var(--accent)} .run-meta{color:var(--muted)}
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+.overview-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.overview-card h3{font-family:var(--serif);font-size:1rem;font-weight:600;color:var(--accent);margin-bottom:12px}
+.overview-card p{color:var(--text2);font-size:0.85rem;line-height:1.7}
+.stack-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.tag{font-family:var(--mono);font-size:0.7rem;padding:4px 10px;border-radius:4px;border:1px solid var(--border);color:var(--text2)}
+.tag.accent{border-color:var(--accent);color:var(--accent)}
+.arch-flow{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+.arch-flow h3{font-family:var(--serif);font-weight:600;color:var(--text);margin-bottom:16px}
+.flow-steps{display:flex;align-items:center;gap:0;flex-wrap:wrap}
+.flow-step{display:flex;flex-direction:column;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:var(--mono);font-size:0.7rem;color:var(--text2);text-align:center;min-width:110px}
+.flow-step .icon{font-size:1.2rem;margin-bottom:4px}
+.flow-step .label{color:var(--accent);font-weight:500}
+.flow-arrow{color:var(--muted);padding:0 8px;font-size:1rem}
+#loading-screen{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.loader-brand{font-family:var(--serif);font-size:1.4rem;color:var(--text)}
+.loader-brand em{color:var(--accent);font-style:italic}
+.loader-bar-wrap{width:260px;height:2px;background:var(--bg3);border-radius:1px;overflow:hidden}
+.loader-bar{height:100%;background:var(--accent);border-radius:1px;animation:load 2s ease-in-out forwards}
+@keyframes load{from{width:0}to{width:100%}}
+.loader-msg{font-family:var(--mono);font-size:0.7rem;color:var(--muted)}
+::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:var(--bg2)} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(4,1fr)}.charts-row{grid-template-columns:1fr 1fr}.tables-row{grid-template-columns:1fr}.overview-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="loading-screen">
+  <div class="loader-brand">Portfolio <em>04</em></div>
+  <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+  <div class="loader-msg" id="loader-msg">Initializing sql.js engine...</div>
+</div>
+<header class="topbar">
+  <div class="topbar-brand">04 <span>/ Cash Flow Monitoring & Financial Reporting</span></div>
+  <nav>
+    <button class="tab-btn active" onclick="showTab('overview',event)">Overview</button>
+    <button class="tab-btn" onclick="showTab('dashboard',event)">Dashboard</button>
+    <button class="tab-btn" onclick="showTab('rawdata',event)">Raw Data</button>
+    <button class="tab-btn" onclick="showTab('sql',event)">SQL Explorer</button>
+    <button class="tab-btn" onclick="showTab('pipeline',event)">Pipeline</button>
+  </nav>
+  <div class="pipeline-badge"><span class="dot"></span>Live · sql.js · SQLite</div>
+</header>
+
+<!-- OVERVIEW -->
+<div class="panel active" id="panel-overview">
+  <div class="arch-flow">
+    <h3>Pipeline Architecture</h3>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="icon">💰</div><div class="label">Google Sheets</div><div>Transaction entry</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">⚙️</div><div class="label">AppScript</div><div>doGet() → JSON</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">🐍</div><div class="label">Python</div><div>Clean + load SQLite</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">🗄️</div><div class="label">SQLite</div><div>cashflow_db.sqlite</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">🔍</div><div class="label">sql.js</div><div>Browser query</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">📊</div><div class="label">Dashboard</div><div>Real-time viz</div></div>
+    </div>
+  </div>
+  <div class="overview-grid">
+    <div class="overview-card"><h3>Problem Statement</h3><p>Without a dedicated accounting system, tracking cash flow across multiple payment methods (Cash, Bank, PayPal, Payoneer, Credit Card) is error-prone. No running balance visibility means decisions are made blind.</p></div>
+    <div class="overview-card"><h3>Solution Built</h3><p>A real-time cash flow monitoring system with auto-categorized transactions, running balance tracking per payment method, and multi-dimensional financial analysis across time, category, and third-party dimensions.</p></div>
+    <div class="overview-card"><h3>Data Collected</h3><p>316 transactions covering Cash-In (project payments, gross income, investments, loans) and Cash-Out (salary, rent, consumption, transportation, entertainment) with full third-party account mapping.</p></div>
+    <div class="overview-card"><h3>Business Impact</h3><p>Net cash flow trending, burn rate analysis by category, ending balance per payment method, largest transaction identification, and daily average income vs expense tracking for financial health monitoring.</p></div>
+  </div>
+  <div class="overview-card"><h3>Tech Stack</h3><div class="stack-tags"><span class="tag accent">Google Sheets</span><span class="tag accent">Google AppScript</span><span class="tag accent">Python 3.13</span><span class="tag accent">SQLite</span><span class="tag accent">sql.js (WebAssembly)</span><span class="tag">Chart.js</span><span class="tag">GitHub Actions</span></div></div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="panel" id="panel-dashboard">
+  <div class="filter-bar">
+    <div class="filter-group"><label>Date From</label><input type="date" id="f-from"></div>
+    <div class="filter-group"><label>Date To</label><input type="date" id="f-to"></div>
+    <div class="filter-group"><label>Type</label>
+      <select id="f-type"><option value="ALL">All Types</option><option>Cash-In</option><option>Cash-Out</option></select>
+    </div>
+    <div class="filter-group"><label>Category</label><select id="f-cat"><option value="ALL">All Categories</option></select></div>
+    <div class="filter-group"><label>Payment Method</label><select id="f-pay"><option value="ALL">All Methods</option></select></div>
+    <button class="btn-apply" onclick="applyFilters()">Apply</button>
+    <button class="btn-reset" onclick="resetFilters()">Reset</button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Total Cash-In</div><div class="kpi-value positive" id="k-in">—</div><div class="kpi-sub">total income</div></div>
+    <div class="kpi-card neg"><div class="kpi-label">Total Cash-Out</div><div class="kpi-value" id="k-out">—</div><div class="kpi-sub">total expense</div></div>
+    <div class="kpi-card warn"><div class="kpi-label">Net Cash Flow</div><div class="kpi-value" id="k-net">—</div><div class="kpi-sub">in minus out</div></div>
+    <div class="kpi-card blue"><div class="kpi-label">Ending Balance</div><div class="kpi-value" id="k-bal">—</div><div class="kpi-sub">latest record</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Transactions</div><div class="kpi-value" id="k-tx">—</div><div class="kpi-sub">all entries</div></div>
+    <div class="kpi-card"><div class="kpi-label">Avg Daily Income</div><div class="kpi-value" id="k-avg-in">—</div><div class="kpi-sub">per active day</div></div>
+    <div class="kpi-card neg"><div class="kpi-label">Avg Daily Expense</div><div class="kpi-value" id="k-avg-out">—</div><div class="kpi-sub">per active day</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card"><h4>Monthly Cash-In vs Cash-Out</h4><div class="chart-wrap"><canvas id="chart-monthly"></canvas></div></div>
+    <div class="chart-card"><h4>Expense Category</h4><div class="chart-wrap"><canvas id="chart-expense"></canvas></div></div>
+    <div class="chart-card"><h4>Payment Method</h4><div class="chart-wrap"><canvas id="chart-pay"></canvas></div></div>
+  </div>
+
+  <div class="tables-row">
+    <div class="table-card">
+      <div class="table-card-header"><h4>Top 10 Largest Expenses</h4></div>
+      <div style="overflow:auto;max-height:260px">
+        <table class="tbl"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Value</th></tr></thead>
+        <tbody id="tbl-expenses"></tbody></table>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-card-header"><h4>Latest 20 Transactions</h4></div>
+      <div style="overflow:auto;max-height:260px">
+        <table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Value</th><th>Balance</th></tr></thead>
+        <tbody id="tbl-latest"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RAW DATA -->
+<div class="panel" id="panel-rawdata">
+  <div class="rawdata-controls">
+    <input class="search-input" id="raw-search" placeholder="Search transactions..." oninput="renderRawData()">
+    <span style="font-family:var(--mono);font-size:0.72rem;color:var(--muted)" id="raw-count"></span>
+  </div>
+  <div class="rawdata-table-wrap"><table class="tbl"><thead><tr id="raw-thead"></tr></thead><tbody id="raw-tbody"></tbody></table></div>
+  <div class="pagination">
+    <span id="pg-info"></span>
+    <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">← Prev</button>
+    <button class="pg-btn" id="pg-next" onclick="changePage(1)">Next →</button>
+  </div>
+</div>
+
+<!-- SQL EXPLORER -->
+<div class="panel" id="panel-sql">
+  <div class="sql-layout">
+    <div class="sql-sidebar">
+      <div class="sql-sidebar-header">Saved Queries</div>
+      <div class="query-list" id="query-list"></div>
+    </div>
+    <div class="sql-main">
+      <div class="sql-editor-wrap">
+        <div class="sql-editor-header"><span id="sql-lbl">Custom Query</span><button class="btn-run" onclick="runSQL()">▶ Run</button></div>
+        <textarea id="sql-editor" spellcheck="false">SELECT * FROM transactions LIMIT 10;</textarea>
+      </div>
+      <div class="sql-result-wrap">
+        <div class="sql-result-info"><span id="sql-info">No results</span><span id="sql-time"></span></div>
+        <div style="overflow:auto"><table class="tbl"><thead><tr id="sql-head"></tr></thead><tbody id="sql-rows"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<div class="panel" id="panel-pipeline">
+  <div class="pipeline-grid">
+    <div class="pipeline-card">
+      <h3>Pipeline Stats</h3>
+      <div class="stat-row">
+        <div class="stat-item"><div class="sv" id="ps-total">—</div><div class="sk">Transactions</div></div>
+        <div class="stat-item"><div class="sv">13</div><div class="sk">Columns</div></div>
+        <div class="stat-item"><div class="sv" id="ps-runs">—</div><div class="sk">Pipeline Runs</div></div>
+      </div>
+      <h3 style="margin-top:16px">Last Runs</h3>
+      <div class="run-history" id="run-history"></div>
+    </div>
+    <div class="pipeline-card">
+      <h3>Python Pipeline (pipeline_04.py)</h3>
+      <div class="code-block"><span class="cmt"># Fetch + clean 316 transactions</span>
+response = requests.<span class="kw">get</span>(WEBAPP_URL)
+payload  = response.<span class="kw">json</span>()
+
+<span class="cmt"># Normalize datetime, derive year_month</span>
+r[<span class="str">"year_month"</span>] = r[<span class="str">"transaction_date"</span>][:7]
+
+<span class="cmt"># Validate: value not negative, enum types</span>
+<span class="kw">if</span> r[<span class="str">"value"</span>] < 0: warnings.append(...)
+
+<span class="cmt"># Upsert by transaction_id (idempotent)</span>
+cur.<span class="kw">execute</span>(UPSERT_SQL, rec)</div>
+    </div>
+    <div class="pipeline-card">
+      <h3>AppScript Export</h3>
+      <div class="code-block"><span class="cmt">// Reads Transaction Database sheet</span>
+<span class="cmt">// Exports 12-column financial records</span>
+<span class="kw">const</span> keyMap = {
+  <span class="str">'Transaction ID'</span>: <span class="str">'transaction_id'</span>,
+  <span class="str">'Transaction Date'</span>: <span class="str">'transaction_date'</span>,
+  <span class="str">'Type of Transaction'</span>: <span class="str">'transaction_type'</span>,
+  <span class="str">'Final Balanced'</span>: <span class="str">'final_balance'</span>
+  <span class="cmt">// ... 8 more columns</span>
+}</div>
+    </div>
+    <div class="pipeline-card">
+      <h3>GitHub Actions Schedule</h3>
+      <div class="code-block"><span class="cmt"># Runs every day 00:01 WIB</span>
+cron: <span class="str">'1 17 * * *'</span>
+
+<span class="kw">env</span>:
+  WEBAPP_URL_04: ${{secrets.WEBAPP_URL_04}}
+
+<span class="kw">run</span>: |
+  cd 04-cash-flow
+  python pipeline_04.py \
+    --url <span class="str">"$WEBAPP_URL_04"</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DB_URL = 'https://raw.githubusercontent.com/USERNAME/portfolio-caraka/main/04-cash-flow/data/cashflow_db.sqlite';
+let db=null, allRawData=[], rawPage=1;
+const RAW_PER_PAGE=50;
+
+const SAVED_QUERIES = [
+  {label:'KPI: Net Cash Flow',type:'kpi',sql:`SELECT\n  ROUND(SUM(CASE WHEN transaction_type='Cash-In' THEN value ELSE 0 END),2) AS cash_in,\n  ROUND(SUM(CASE WHEN transaction_type='Cash-Out' THEN value ELSE 0 END),2) AS cash_out,\n  ROUND(SUM(CASE WHEN transaction_type='Cash-In' THEN value ELSE -value END),2) AS net\nFROM transactions;`},
+  {label:'KPI: Ending Balance',type:'kpi',sql:`SELECT final_balance FROM transactions ORDER BY transaction_date DESC, timestamp_input DESC LIMIT 1;`},
+  {label:'Chart: Monthly Cashflow',type:'chart',sql:`SELECT year_month, ROUND(SUM(CASE WHEN transaction_type='Cash-In' THEN value ELSE 0 END),2) AS income, ROUND(SUM(CASE WHEN transaction_type='Cash-Out' THEN value ELSE 0 END),2) AS expense FROM transactions WHERE year_month IS NOT NULL GROUP BY year_month ORDER BY year_month;`},
+  {label:'Chart: Expense Category',type:'chart',sql:`SELECT category, ROUND(SUM(value),2) AS total FROM transactions WHERE transaction_type='Cash-Out' AND category IS NOT NULL GROUP BY category ORDER BY total DESC;`},
+  {label:'Chart: Payment Method',type:'chart',sql:`SELECT payment_method, COUNT(*) AS n, ROUND(SUM(value),2) AS val FROM transactions WHERE payment_method IS NOT NULL GROUP BY payment_method ORDER BY val DESC;`},
+  {label:'Table: Largest Expenses',type:'table',sql:`SELECT transaction_date, category, description, value, payment_method FROM transactions WHERE transaction_type='Cash-Out' ORDER BY value DESC LIMIT 15;`},
+  {label:'Table: Latest Transactions',type:'table',sql:`SELECT transaction_id, transaction_date, transaction_type, category, value, final_balance FROM transactions ORDER BY transaction_date DESC LIMIT 20;`},
+  {label:'Analytics: Monthly Summary',type:'analytics',sql:`SELECT year_month, ROUND(SUM(CASE WHEN transaction_type='Cash-In' THEN value ELSE 0 END),2) AS income, ROUND(SUM(CASE WHEN transaction_type='Cash-Out' THEN value ELSE 0 END),2) AS expense, COUNT(*) AS tx FROM transactions GROUP BY year_month ORDER BY year_month;`},
+  {label:'Analytics: Top Third Party',type:'analytics',sql:`SELECT third_party_name, transaction_type, COUNT(*) AS n, ROUND(SUM(value),2) AS total FROM transactions WHERE third_party_name IS NOT NULL GROUP BY third_party_name, transaction_type ORDER BY total DESC LIMIT 10;`},
+  {label:'Meta: Pipeline Runs',type:'meta',sql:`SELECT * FROM pipeline_runs ORDER BY run_id DESC LIMIT 10;`},
+];
+
+async function init(){
+  setMsg('Loading sql.js...');
+  const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}`});
+  setMsg('Fetching database...');
+  let buf;
+  try{const r=await fetch(DB_URL);if(!r.ok)throw new Error();buf=await r.arrayBuffer();}
+  catch{try{const r=await fetch('./data/cashflow_db.sqlite');buf=await r.arrayBuffer();}catch{setMsg('⚠ Cannot load database. Check DB_URL.');setTimeout(()=>hide(),3000);return;}}
+  setMsg('Rendering...');
+  db=new SQL.Database(new Uint8Array(buf));
+  buildQueryList();populateFilters();renderDashboard();renderRawData();renderPipeline();
+  hide();
+}
+function setMsg(m){document.getElementById('loader-msg').textContent=m;}
+function hide(){document.getElementById('loading-screen').style.display='none';}
+
+function showTab(name,e){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  e.currentTarget.classList.add('active');
+}
+
+function q(sql){if(!db)return[];try{const s=db.prepare(sql);const r=[];while(s.step())r.push(s.getAsObject());s.free();return r;}catch(e){console.error(e.message);return[];}}
+
+function populateFilters(){
+  fillSel('f-cat',q('SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL ORDER BY category'),'category');
+  fillSel('f-pay',q('SELECT DISTINCT payment_method FROM transactions WHERE payment_method IS NOT NULL ORDER BY payment_method'),'payment_method');
+}
+function fillSel(id,rows,col){const s=document.getElementById(id);rows.forEach(r=>{const o=document.createElement('option');o.value=o.textContent=r[col];s.appendChild(o);});}
+
+function getF(){return{from:document.getElementById('f-from').value,to:document.getElementById('f-to').value,type:document.getElementById('f-type').value,cat:document.getElementById('f-cat').value,pay:document.getElementById('f-pay').value};}
+function buildW(f){const c=[];if(f.from)c.push(`transaction_date>='${f.from}'`);if(f.to)c.push(`transaction_date<='${f.to}'`);if(f.type!=='ALL')c.push(`transaction_type='${f.type}'`);if(f.cat!=='ALL')c.push(`category='${f.cat}'`);if(f.pay!=='ALL')c.push(`payment_method='${f.pay}'`);return c.length?'WHERE '+c.join(' AND '):'';}
+function applyFilters(){renderDashboard();}
+function resetFilters(){document.getElementById('f-from').value='';document.getElementById('f-to').value='';['f-type','f-cat','f-pay'].forEach(id=>document.getElementById(id).selectedIndex=0);renderDashboard();}
+
+const charts={};
+function renderDashboard(){const f=getF();const w=buildW(f);renderKPIs(w);renderCharts(w);renderTables(w);}
+
+function renderKPIs(w){
+  const ww=w?w+' AND ':'WHERE ';
+  const base=q(`SELECT ROUND(SUM(CASE WHEN transaction_type='Cash-In' THEN value ELSE 0 END),2) AS ci, ROUND(SUM(CASE WHEN transaction_type='Cash-Out' THEN value ELSE 0 END),2) AS co, COUNT(*) AS tx FROM transactions ${w}`)[0]||{};
+  const net=(base.ci||0)-(base.co||0);
+  const bal=q(`SELECT final_balance FROM transactions ${w} ORDER BY transaction_date DESC LIMIT 1`)[0]?.final_balance;
+  const avgIn=q(`SELECT ROUND(SUM(value)/COUNT(DISTINCT transaction_date),2) AS n FROM transactions ${ww} transaction_type='Cash-In'`)[0]?.n;
+  const avgOut=q(`SELECT ROUND(SUM(value)/COUNT(DISTINCT transaction_date),2) AS n FROM transactions ${ww} transaction_type='Cash-Out'`)[0]?.n;
+  const fmt=n=>n!=null?'$'+Number(n).toLocaleString():'—';
+  set('k-in',fmt(base.ci));set('k-out',fmt(base.co));set('k-tx',base.tx??'—');
+  const nEl=document.getElementById('k-net');nEl.textContent=fmt(net);nEl.className='kpi-value '+(net>=0?'positive':'negative');
+  set('k-bal',fmt(bal));set('k-avg-in',fmt(avgIn));set('k-avg-out',fmt(avgOut));
+}
+function set(id,v){document.getElementById(id).textContent=v;}
+
+function renderCharts(w){
+  const ww=w?w+' AND ':'WHERE ';
+  const mon=q(`SELECT year_month AS m, ROUND(SUM(CASE WHEN transaction_type='Cash-In' THEN value ELSE 0 END),2) AS i, ROUND(SUM(CASE WHEN transaction_type='Cash-Out' THEN value ELSE 0 END),2) AS o FROM transactions ${w} ${w?'AND':'WHERE'} year_month IS NOT NULL GROUP BY m ORDER BY m`);
+  const exp=q(`SELECT category, ROUND(SUM(value),2) AS n FROM transactions ${ww} transaction_type='Cash-Out' AND category IS NOT NULL GROUP BY category ORDER BY n DESC LIMIT 7`);
+  const pay=q(`SELECT payment_method, COUNT(*) AS n FROM transactions ${w} ${w?'AND':'WHERE'} payment_method IS NOT NULL GROUP BY payment_method ORDER BY n DESC`);
+  const P=['#7aff9c','#ff8c6b','#ffd166','#3dbbff','#c77dff','#4cc9f0','#a8dadc'];
+  mkChart('chart-monthly','bar',{labels:mon.map(r=>r.m),datasets:[{label:'Cash-In',data:mon.map(r=>r.i),backgroundColor:'#7aff9c20',borderColor:'#7aff9c',borderWidth:1.5},{label:'Cash-Out',data:mon.map(r=>r.o),backgroundColor:'#ff8c6b20',borderColor:'#ff8c6b',borderWidth:1.5}]});
+  mkChart('chart-expense','doughnut',{labels:exp.map(r=>r.category),datasets:[{data:exp.map(r=>r.n),backgroundColor:P,borderWidth:0}]});
+  mkChart('chart-pay','doughnut',{labels:pay.map(r=>r.payment_method),datasets:[{data:pay.map(r=>r.n),backgroundColor:P.slice(1),borderWidth:0}]});
+}
+function mkChart(id,type,data){if(charts[id])charts[id].destroy();const ctx=document.getElementById(id).getContext('2d');charts[id]=new Chart(ctx,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0b8a0',font:{family:"'DM Mono'",size:10},boxWidth:10}}},scales:type==='bar'?{x:{grid:{color:'#2a3a2a'},ticks:{color:'#6b806b',font:{family:"'DM Mono'",size:10}}},y:{grid:{color:'#2a3a2a'},ticks:{color:'#6b806b',font:{family:"'DM Mono'",size:10}}}}:{}}})}
+
+function renderTables(w){
+  const ww=w?w+' AND ':'WHERE ';
+  const exp=q(`SELECT transaction_date,category,description,value,payment_method FROM transactions ${ww} transaction_type='Cash-Out' ORDER BY value DESC LIMIT 10`);
+  const lat=q(`SELECT transaction_date,transaction_type,category,value,final_balance FROM transactions ${w} ORDER BY transaction_date DESC,timestamp_input DESC LIMIT 20`);
+  document.getElementById('tbl-expenses').innerHTML=exp.map(r=>`<tr><td>${r.transaction_date||'—'}</td><td>${r.category||'—'}</td><td>${r.description||'—'}</td><td>$${Number(r.value).toLocaleString()}</td></tr>`).join('');
+  document.getElementById('tbl-latest').innerHTML=lat.map(r=>`<tr><td>${r.transaction_date||'—'}</td><td><span class="badge ${r.transaction_type==='Cash-In'?'badge-in':'badge-out'}">${r.transaction_type}</span></td><td>${r.category||'—'}</td><td>$${Number(r.value).toLocaleString()}</td><td>$${Number(r.final_balance).toLocaleString()}</td></tr>`).join('');
+}
+
+function renderRawData(){if(!db)return;const s=document.getElementById('raw-search').value.toLowerCase();const all=q('SELECT * FROM transactions ORDER BY transaction_date DESC');allRawData=s?all.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(s))):all;rawPage=1;renderRawPage();}
+function renderRawPage(){const total=allRawData.length;const start=(rawPage-1)*RAW_PER_PAGE;const rows=allRawData.slice(start,start+RAW_PER_PAGE);if(!rows.length)return;const cols=Object.keys(rows[0]).filter(c=>!c.startsWith('_'));document.getElementById('raw-thead').innerHTML=cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('');document.getElementById('raw-tbody').innerHTML=rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`).join('');set('pg-info',`${start+1}–${Math.min(start+RAW_PER_PAGE,total)} of ${total}`);set('raw-count',`${total} records`);document.getElementById('pg-prev').disabled=rawPage<=1;document.getElementById('pg-next').disabled=rawPage>=Math.ceil(total/RAW_PER_PAGE);}
+function changePage(d){rawPage+=d;renderRawPage();}
+
+function buildQueryList(){const list=document.getElementById('query-list');list.innerHTML=SAVED_QUERIES.map((q,i)=>`<div class="query-item ${i===0?'active':''}" onclick="loadQuery(${i},this)"><div class="q-label">${q.label}</div><div class="q-type">${q.type}</div></div>`).join('');loadQuery(0,list.querySelector('.query-item'));}
+function loadQuery(i,el){document.querySelectorAll('.query-item').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.getElementById('sql-editor').value=SAVED_QUERIES[i].sql;document.getElementById('sql-lbl').textContent=SAVED_QUERIES[i].label;runSQL();}
+function runSQL(){if(!db)return;const sql=document.getElementById('sql-editor').value.trim();if(!sql)return;const t0=performance.now();try{const s=db.prepare(sql);const rows=[];while(s.step())rows.push(s.getAsObject());s.free();const ms=(performance.now()-t0).toFixed(1);set('sql-info',`${rows.length} rows`);set('sql-time',`${ms}ms`);if(!rows.length){document.getElementById('sql-head').innerHTML='';document.getElementById('sql-rows').innerHTML='<tr><td style="padding:16px;color:var(--muted)">0 rows</td></tr>';return;}const cols=Object.keys(rows[0]);document.getElementById('sql-head').innerHTML=cols.map(c=>`<th>${c}</th>`).join('');document.getElementById('sql-rows').innerHTML=rows.slice(0,200).map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'null'}</td>`).join('')}</tr>`).join('');}catch(e){set('sql-info','Error');document.getElementById('sql-head').innerHTML='';document.getElementById('sql-rows').innerHTML=`<tr><td style="padding:16px;color:var(--danger);font-family:var(--mono)">${e.message}</td></tr>`;}}
+
+function renderPipeline(){if(!db)return;const total=q('SELECT COUNT(*) AS n FROM transactions')[0]?.n??'—';const runs=q('SELECT COUNT(*) AS n FROM pipeline_runs')[0]?.n??'—';const hist=q('SELECT * FROM pipeline_runs ORDER BY run_id DESC LIMIT 6');set('ps-total',total);set('ps-runs',runs);document.getElementById('run-history').innerHTML=hist.map(r=>`<div class="run-row"><span class="run-status">✓ ${r.run_at?.slice(0,16)||'—'}</span><span class="run-meta">${r.loaded_total} loaded · ${r.warnings} warn</span></div>`).join('')||'<div class="run-row"><span class="run-meta">No runs yet</span></div>';}
+
+init();
+</script>
+</body>
+</html>
