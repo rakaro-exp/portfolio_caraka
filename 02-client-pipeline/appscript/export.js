@@ -1,60 +1,75 @@
-// ============================================================
-// TAMBAHKAN KE APPSCRIPT TOOL 04 (Cash Flow Monitoring)
-// Tambahkan di bawah fungsi kirimDataUang yang sudah ada
-// ============================================================
-
 function doGet(e) {
-  const output = exportCashFlowAsJSON();
+  const output = exportLeadsAsJSON();
   return ContentService
     .createTextOutput(JSON.stringify(output, null, 2))
     .setMimeType(ContentService.MimeType.JSON);
 }
-
-function exportCashFlowAsJSON() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Transaction Database');
-
+ 
+function exportLeadsAsJSON() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Database Leads');
+ 
   if (!sheet) {
-    return { error: true, message: 'Sheet Transaction Database tidak ditemukan.' };
+    return { error: true, message: 'Sheet Database Leads tidak ditemukan.' };
   }
-
+ 
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) {
     return { error: true, message: 'Database kosong.' };
   }
-
-  const keyMap = {
-    'Transaction ID':       'transaction_id',
-    'Timestamp Input':      'timestamp_input',
-    'Transaction Date':     'transaction_date',
-    'Type of Transaction':  'transaction_type',
-    'Category':             'category',
-    'Description':          'description',
-    'Value':                'value',
-    'Payment Methods':      'payment_method',
-    'Third-Party Account':  'third_party_account',
-    'Third-Party Name':     'third_party_name',
-    'Final Balanced':       'final_balance',
-    'Month':                'month'
-  };
-
+ 
+  // Header dari baris pertama
   const headers = data[0].map(h => String(h).trim());
+ 
+  // Map nama header ke key yang bersih (snake_case, aman untuk Python & SQL)
+  const keyMap = {
+    'ID Leads':               'id_leads',
+    'Lead Name':              'lead_name',
+    'Company':                'company',
+    'Source':                 'source',
+    'Lead Number':            'lead_number',
+    'Lead Email':             'lead_email',
+    'Date':                   'created_date',
+    'Status':                 'status',
+    'Score':                  'lead_score',
+    'Total Interaction':      'total_interaction',
+    'Country / Region':       'country_region',
+    'Service':                'service_interest',
+    'Owner':                  'lead_owner',
+    'Preferred Contact':      'preferred_contact',
+    'Priority Level':         'priority_level',
+    'Estimated Budget Range': 'estimated_budget',
+    'Notes Summary':          'notes_summary',
+    'Stage':                  'decision_stage',
+    'Contract Status':        'contract_status',
+    'Budget':                 'project_budget',
+    'Contract Start':         'contract_start',
+    'Contract End':           'contract_end',
+    'Last Contact Date':      'last_contact_date',
+    'Follow Up':              'next_followup_date'
+  };
+ 
   const records = [];
   const exportedAt = Utilities.formatDate(
-    new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    new Date(),
+    Session.getScriptTimeZone(),
+    "yyyy-MM-dd'T'HH:mm:ss'Z'"
   );
-
+ 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
+ 
+    // Skip baris kosong (cek kolom A = ID Leads)
     if (!row[0] || String(row[0]).trim() === '') continue;
-
+ 
     const record = {};
     headers.forEach((header, idx) => {
       const key = keyMap[header] || header.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
       let value = row[idx];
-
+ 
+      // Normalisasi tipe data
       if (value instanceof Date) {
-        value = Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+        value = Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
       } else if (value === null || value === undefined || value === '') {
         value = null;
       } else if (typeof value === 'number') {
@@ -62,32 +77,34 @@ function exportCashFlowAsJSON() {
       } else {
         value = String(value).trim();
       }
-
+ 
       record[key] = value;
     });
-
+ 
     records.push(record);
   }
-
+ 
   return {
     error:       false,
-    tool:        '04_cash_flow',
+    tool:        '02_client_pipeline',
     exported_at: exportedAt,
     total_rows:  records.length,
     columns:     Object.keys(records[0] || {}),
     data:        records
   };
 }
-
+ 
+// ------------------------------------------------------------
+// TRIGGER MANUAL — bisa dipanggil dari menu untuk test
+// ------------------------------------------------------------
 function testExportJSON() {
-  const result = exportCashFlowAsJSON();
+  const result = exportLeadsAsJSON();
   Logger.log('Total rows exported: ' + result.total_rows);
+  Logger.log('Columns: ' + JSON.stringify(result.columns));
   Logger.log('First record: ' + JSON.stringify(result.data[0]));
   SpreadsheetApp.getUi().alert(
-    'Export berhasil!\nTotal transaksi: ' + result.total_rows + '\nExported at: ' + result.exported_at
+    'Export berhasil!\n' +
+    'Total leads: ' + result.total_rows + '\n' +
+    'Exported at: ' + result.exported_at
   );
 }
-
-// Di onOpen() yang ada, tambahkan:
-// .addSeparator()
-// .addItem('🔁 Test Export JSON', 'testExportJSON')
