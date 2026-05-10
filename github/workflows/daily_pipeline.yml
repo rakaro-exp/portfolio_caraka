@@ -1,0 +1,74 @@
+# .github/workflows/daily_pipeline.yml
+# ============================================================
+# GitHub Actions — Otomasi Pipeline Harian
+# Jadwal: setiap hari 00:01 WIB = 17:01 UTC (hari sebelumnya)
+# ============================================================
+
+name: Daily Data Pipeline
+
+on:
+  schedule:
+    # 17:01 UTC = 00:01 WIB (UTC+7)
+    - cron: '1 17 * * *'
+
+  # Bisa juga trigger manual dari tab Actions di GitHub
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: 'Pipeline yang dijalankan'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - pipeline_02
+          - pipeline_04
+          - pipeline_09
+
+jobs:
+  run-pipelines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      # ── Pipeline 02 ──────────────────────────────────────
+      - name: Run Pipeline 02 — Client Pipeline
+        if: ${{ github.event.inputs.pipeline == 'all' || github.event.inputs.pipeline == 'pipeline_02' || github.event_name == 'schedule' }}
+        env:
+          WEBAPP_URL_02: ${{ secrets.WEBAPP_URL_02 }}
+        run: |
+          cd 02-client-pipeline
+          python pipeline_02.py --url "$WEBAPP_URL_02"
+
+      # ── Pipeline 04 ──────────────────────────────────────
+      - name: Run Pipeline 04 — Cash Flow
+        if: ${{ github.event.inputs.pipeline == 'all' || github.event.inputs.pipeline == 'pipeline_04' || github.event_name == 'schedule' }}
+        env:
+          WEBAPP_URL_04: ${{ secrets.WEBAPP_URL_04 }}
+        run: |
+          cd 04-cash-flow
+          python pipeline_04.py --url "$WEBAPP_URL_04"
+
+      # ── Pipeline 09 ──────────────────────────────────────
+      - name: Run Pipeline 09 — Revenue Ops
+        if: ${{ github.event.inputs.pipeline == 'all' || github.event.inputs.pipeline == 'pipeline_09' || github.event_name == 'schedule' }}
+        env:
+          WEBAPP_URL_09: ${{ secrets.WEBAPP_URL_09 }}
+        run: |
+          cd 09-revenue-ops
+          python pipeline_09.py --url "$WEBAPP_URL_09"
+
+      - name: Pipeline selesai
+        run: echo "✅ Semua pipeline selesai pada $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
