@@ -3,7 +3,7 @@
 # ============================================================
 
 # SQLite databases (tidak dipublikasikan)
-*.sqlite
+!**/data/.sqlite
 *.db
 *.sqlite3
 
