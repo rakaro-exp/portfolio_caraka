@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revenue Operations & Inventory System — Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0f0a00; --bg2:#181200; --bg3:#241c00;
+  --border:#3a2e00; --accent:#ffd166; --accent2:#ff9f40;
+  --muted:#806b00; --text:#f0e8d0; --text2:#b8a870;
+  --danger:#ff6b6b; --green:#7aff9c; --blue:#3dbbff;
+  --mono:'DM Mono',monospace; --serif:'Fraunces',serif;
+  --sans:'DM Sans',sans-serif; --radius:10px; --tab-h:52px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-weight:300;min-height:100vh;line-height:1.6}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(15,10,0,0.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;height:var(--tab-h)}
+.topbar-brand{font-family:var(--serif);font-weight:600;font-size:1.05rem;color:var(--accent);white-space:nowrap;margin-right:32px}
+.topbar-brand span{color:var(--text2);font-weight:300;font-size:0.85rem;margin-left:6px}
+nav{display:flex;gap:2px;flex:1}
+.tab-btn{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:0.75rem;padding:6px 16px;border-radius:6px;cursor:pointer;letter-spacing:0.05em;transition:all 0.15s;white-space:nowrap}
+.tab-btn:hover{color:var(--text);background:var(--bg3)}
+.tab-btn.active{color:var(--accent);background:rgba(255,209,102,0.08)}
+.pipeline-badge{font-family:var(--mono);font-size:0.65rem;color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:20px;white-space:nowrap;margin-left:auto}
+.pipeline-badge .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.panel{display:none;padding:32px 28px;animation:fadeIn 0.2s ease}
+.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* Filter */
+.filter-bar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:5px}
+.filter-group label{font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase}
+.filter-group select,.filter-group input{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:0.75rem;padding:7px 10px;border-radius:6px;outline:none;min-width:130px}
+.filter-group select:focus,.filter-group input:focus{border-color:var(--accent)}
+.btn-apply{background:var(--accent);color:var(--bg);border:none;font-family:var(--mono);font-size:0.75rem;font-weight:500;padding:8px 18px;border-radius:6px;cursor:pointer;align-self:flex-end;transition:opacity 0.15s}
+.btn-apply:hover{opacity:0.85}
+.btn-reset{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:0.75rem;padding:8px 14px;border-radius:6px;cursor:pointer;align-self:flex-end;transition:all 0.15s}
+.btn-reset:hover{border-color:var(--text2);color:var(--text2)}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:24px}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 14px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.kpi-card.green::before{background:var(--green)}
+.kpi-card.blue::before{background:var(--blue)}
+.kpi-card.danger::before{background:var(--danger)}
+.kpi-label{font-family:var(--mono);font-size:0.6rem;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:7px}
+.kpi-value{font-family:var(--serif);font-size:1.4rem;font-weight:600;color:var(--text);line-height:1}
+.kpi-sub{font-family:var(--mono);font-size:0.6rem;color:var(--muted);margin-top:4px}
+.kpi-value.danger-v{color:var(--danger)}
+.kpi-value.green-v{color:var(--green)}
+
+/* Charts */
+.charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.chart-card h4{font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:16px}
+.chart-wrap{position:relative;height:200px}
+
+/* Tabs within dashboard for stockout vs inventory */
+.inner-tabs{display:flex;gap:4px;margin-bottom:16px}
+.inner-tab{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:0.72rem;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s}
+.inner-tab.active{background:rgba(255,209,102,0.1);border-color:var(--accent);color:var(--accent)}
+.inner-panel{display:none}
+.inner-panel.active{display:block}
+
+/* Tables */
+.tables-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-card-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.table-card-header h4{font-family:var(--mono);font-size:0.7rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase}
+.cnt-badge{font-family:var(--mono);font-size:0.65rem;padding:2px 8px;border-radius:10px}
+.cnt-warn{background:rgba(255,107,107,0.12);color:var(--danger)}
+.cnt-ok{background:rgba(122,255,156,0.1);color:var(--green)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-family:var(--mono);font-size:0.65rem;color:var(--muted);text-align:left;padding:8px 14px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em}
+.tbl td{padding:7px 14px;font-size:0.78rem;border-bottom:1px solid rgba(58,46,0,0.5);color:var(--text2)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,209,102,0.03);color:var(--text)}
+.badge{display:inline-block;font-family:var(--mono);font-size:0.65rem;padding:2px 8px;border-radius:4px}
+.badge-out{background:rgba(255,107,107,0.12);color:var(--danger)}
+.badge-low{background:rgba(255,209,102,0.12);color:var(--accent)}
+.badge-ok{background:rgba(122,255,156,0.1);color:var(--green)}
+
+/* Stock bar visual */
+.stock-bar-wrap{background:var(--bg3);border-radius:2px;height:4px;width:60px;display:inline-block;vertical-align:middle;margin-left:6px}
+.stock-bar-fill{height:100%;border-radius:2px;background:var(--green)}
+.stock-bar-fill.warn{background:var(--accent)}
+.stock-bar-fill.crit{background:var(--danger)}
+
+/* SQL / Raw / Pipeline same pattern */
+.sql-layout{display:grid;grid-template-columns:260px 1fr;gap:20px;height:calc(100vh - 120px)}
+.sql-sidebar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.sql-sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em}
+.query-list{flex:1;overflow-y:auto}
+.query-item{padding:10px 16px;cursor:pointer;border-bottom:1px solid rgba(58,46,0,0.5);transition:background 0.1s}
+.query-item:hover{background:var(--bg3)}
+.query-item.active{background:rgba(255,209,102,0.06);border-left:2px solid var(--accent)}
+.query-item .q-label{font-family:var(--mono);font-size:0.72rem;color:var(--text);margin-bottom:2px}
+.query-item .q-type{font-family:var(--mono);font-size:0.62rem;color:var(--muted)}
+.sql-main{display:flex;flex-direction:column;gap:16px}
+.sql-editor-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.sql-editor-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.7rem;color:var(--muted)}
+#sql-editor{width:100%;min-height:160px;resize:vertical;background:var(--bg2);border:none;color:var(--accent);font-family:var(--mono);font-size:0.8rem;padding:16px;outline:none;line-height:1.6}
+.btn-run{background:var(--accent);color:var(--bg);border:none;font-family:var(--mono);font-size:0.75rem;font-weight:500;padding:7px 16px;border-radius:5px;cursor:pointer}
+.btn-run:hover{opacity:0.85}
+.sql-result-wrap{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:auto}
+.sql-result-info{padding:10px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.68rem;color:var(--muted);display:flex;justify-content:space-between}
+.rawdata-controls{display:flex;gap:12px;margin-bottom:16px;align-items:center}
+.rawdata-tabs{display:flex;gap:4px;margin-bottom:12px}
+.rawdata-tab{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:0.72rem;padding:5px 14px;border-radius:5px;cursor:pointer}
+.rawdata-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(255,209,102,0.08)}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:0.78rem;padding:9px 14px;border-radius:6px;outline:none}
+.search-input:focus{border-color:var(--accent)}
+.rawdata-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:calc(100vh - 260px)}
+.rawdata-table-wrap table{min-width:900px}
+.pagination{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-family:var(--mono);font-size:0.72rem;color:var(--muted)}
+.pg-btn{background:var(--bg2);border:1px solid var(--border);color:var(--text2);padding:5px 10px;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:0.7rem}
+.pg-btn:disabled{opacity:0.3;cursor:default}
+.pg-btn:not(:disabled):hover{border-color:var(--accent);color:var(--accent)}
+.pipeline-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.pipeline-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+.pipeline-card h3{font-family:var(--mono);font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px;font-family:var(--mono);font-size:0.73rem;color:var(--text2);line-height:1.8;overflow-x:auto;white-space:pre}
+.code-block .kw{color:var(--accent)} .code-block .str{color:var(--green)} .code-block .cmt{color:var(--muted)}
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-item{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px;text-align:center}
+.stat-item .sv{font-family:var(--serif);font-size:1.2rem;color:var(--accent)}
+.stat-item .sk{font-family:var(--mono);font-size:0.62rem;color:var(--muted);margin-top:2px}
+.run-history{margin-top:14px}
+.run-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(58,46,0,0.5);font-family:var(--mono);font-size:0.72rem}
+.run-row:last-child{border-bottom:none}
+.run-status{color:var(--accent)} .run-meta{color:var(--muted)}
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+.overview-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.overview-card h3{font-family:var(--serif);font-size:1rem;font-weight:600;color:var(--accent);margin-bottom:12px}
+.overview-card p{color:var(--text2);font-size:0.85rem;line-height:1.7}
+.stack-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.tag{font-family:var(--mono);font-size:0.7rem;padding:4px 10px;border-radius:4px;border:1px solid var(--border);color:var(--text2)}
+.tag.accent{border-color:var(--accent);color:var(--accent)}
+.arch-flow{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+.arch-flow h3{font-family:var(--serif);font-weight:600;color:var(--text);margin-bottom:16px}
+.flow-steps{display:flex;align-items:center;flex-wrap:wrap}
+.flow-step{display:flex;flex-direction:column;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:var(--mono);font-size:0.7rem;color:var(--text2);text-align:center;min-width:110px}
+.flow-step .icon{font-size:1.2rem;margin-bottom:4px}
+.flow-step .label{color:var(--accent);font-weight:500}
+.flow-arrow{color:var(--muted);padding:0 8px;font-size:1rem}
+#loading-screen{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.loader-brand{font-family:var(--serif);font-size:1.4rem;color:var(--text)}
+.loader-brand em{color:var(--accent);font-style:italic}
+.loader-bar-wrap{width:260px;height:2px;background:var(--bg3);border-radius:1px;overflow:hidden}
+.loader-bar{height:100%;background:var(--accent);border-radius:1px;animation:load 2s ease-in-out forwards}
+@keyframes load{from{width:0}to{width:100%}}
+.loader-msg{font-family:var(--mono);font-size:0.7rem;color:var(--muted)}
+::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:var(--bg2)} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:1200px){.kpi-row{grid-template-columns:repeat(4,1fr)}.charts-row{grid-template-columns:1fr 1fr}.tables-row{grid-template-columns:1fr}.overview-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="loader-brand">Portfolio <em>09</em></div>
+  <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+  <div class="loader-msg" id="loader-msg">Initializing sql.js engine...</div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-brand">09 <span>/ Revenue Operations & Inventory System</span></div>
+  <nav>
+    <button class="tab-btn active" onclick="showTab('overview',event)">Overview</button>
+    <button class="tab-btn" onclick="showTab('dashboard',event)">Dashboard</button>
+    <button class="tab-btn" onclick="showTab('rawdata',event)">Raw Data</button>
+    <button class="tab-btn" onclick="showTab('sql',event)">SQL Explorer</button>
+    <button class="tab-btn" onclick="showTab('pipeline',event)">Pipeline</button>
+  </nav>
+  <div class="pipeline-badge"><span class="dot"></span>Live · sql.js · SQLite</div>
+</header>
+
+<!-- OVERVIEW -->
+<div class="panel active" id="panel-overview">
+  <div class="arch-flow">
+    <h3>Pipeline Architecture</h3>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="icon">🏪</div><div class="label">Google Sheets</div><div>POS + Inventory</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">⚙️</div><div class="label">AppScript</div><div>doGet(?sheet=)</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">🐍</div><div class="label">Python</div><div>Clean 2 tables</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">🗄️</div><div class="label">SQLite</div><div>inventory_db.sqlite</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">🔍</div><div class="label">sql.js</div><div>Browser query</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="icon">📊</div><div class="label">Dashboard</div><div>Real-time viz</div></div>
+    </div>
+  </div>
+  <div class="overview-grid">
+    <div class="overview-card"><h3>Problem Statement</h3><p>Managing 100 SKUs across a retail POS operation without dedicated inventory software creates stockout blind spots, margin erosion from untracked discounts, and zero visibility into cashier performance or product profitability.</p></div>
+    <div class="overview-card"><h3>Solution Built</h3><p>A fully integrated retail operations system: POS transaction recording with auto stock deduction via AppScript onEdit() trigger, product catalog management with COGS-based margin calculation, and receipt PDF generation — all feeding into this analytical dashboard.</p></div>
+    <div class="overview-card"><h3>Data Collected</h3><p>104 transaction line items across multiple invoices, 100 SKUs with real-time stock levels, COGS vs selling price per unit, per-cashier sales records, payment method distribution, and margin per product line.</p></div>
+    <div class="overview-card"><h3>Business Impact</h3><p>Stock alert system (qty ≤ 10), margin percentage per SKU, top products by revenue and quantity, cashier performance benchmarking, inventory capital value vs potential selling value gap analysis.</p></div>
+  </div>
+  <div class="overview-card"><h3>Tech Stack</h3><div class="stack-tags"><span class="tag accent">Google Sheets</span><span class="tag accent">Google AppScript</span><span class="tag accent">Python 3.13</span><span class="tag accent">SQLite</span><span class="tag accent">sql.js (WebAssembly)</span><span class="tag">Chart.js</span><span class="tag">GitHub Actions</span><span class="tag">LockService (race condition prevention)</span></div></div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="panel" id="panel-dashboard">
+  <div class="filter-bar">
+    <div class="filter-group"><label>Date From</label><input type="date" id="f-from"></div>
+    <div class="filter-group"><label>Date To</label><input type="date" id="f-to"></div>
+    <div class="filter-group"><label>Cashier</label><select id="f-cashier"><option value="ALL">All Cashiers</option></select></div>
+    <div class="filter-group"><label>Payment Method</label><select id="f-pay"><option value="ALL">All Methods</option></select></div>
+    <div class="filter-group"><label>SKU / Product</label><input type="text" id="f-sku" placeholder="e.g. GLB0001"></div>
+    <div class="filter-group"><label>Stock Status</label>
+      <select id="f-stock"><option value="ALL">All SKU</option><option value="available">Available</option><option value="stockout">Stockout</option><option value="low">Low Stock (≤10)</option></select>
+    </div>
+    <button class="btn-apply" onclick="applyFilters()">Apply</button>
+    <button class="btn-reset" onclick="resetFilters()">Reset</button>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value" id="k-rev">—</div><div class="kpi-sub">all sales</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Total Profit</div><div class="kpi-value green-v" id="k-profit">—</div><div class="kpi-sub">margin earned</div></div>
+    <div class="kpi-card"><div class="kpi-label">Invoices</div><div class="kpi-value" id="k-inv">—</div><div class="kpi-sub">unique orders</div></div>
+    <div class="kpi-card"><div class="kpi-label">Items Sold</div><div class="kpi-value" id="k-qty">—</div><div class="kpi-sub">total units</div></div>
+    <div class="kpi-card blue"><div class="kpi-label">Avg Order Value</div><div class="kpi-value" id="k-aov">—</div><div class="kpi-sub">per invoice</div></div>
+    <div class="kpi-card"><div class="kpi-label">Margin %</div><div class="kpi-value" id="k-margin">—</div><div class="kpi-sub">overall</div></div>
+    <div class="kpi-card"><div class="kpi-label">Active SKU</div><div class="kpi-value" id="k-active">—</div><div class="kpi-sub">stock > 0</div></div>
+    <div class="kpi-card danger"><div class="kpi-label">Stockout SKU</div><div class="kpi-value danger-v" id="k-stockout">—</div><div class="kpi-sub">qty = 0</div></div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="charts-row">
+    <div class="chart-card"><h4>Monthly Sales & Profit Trend</h4><div class="chart-wrap"><canvas id="chart-monthly"></canvas></div></div>
+    <div class="chart-card"><h4>Top 8 Products by Revenue</h4><div class="chart-wrap"><canvas id="chart-top-products"></canvas></div></div>
+    <div class="chart-card"><h4>Payment Method & Cashier</h4>
+      <div class="inner-tabs">
+        <div class="inner-tab active" onclick="switchInner('pay',this)">Payment</div>
+        <div class="inner-tab" onclick="switchInner('cashier',this)">Cashier</div>
+      </div>
+      <div class="inner-panel active" id="inner-pay"><div class="chart-wrap"><canvas id="chart-pay"></canvas></div></div>
+      <div class="inner-panel" id="inner-cashier"><div class="chart-wrap"><canvas id="chart-cashier"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- Tables Row -->
+  <div class="tables-row">
+    <div class="table-card">
+      <div class="table-card-header"><h4>Stock Alert (qty ≤ 10)</h4><span class="cnt-badge cnt-warn" id="cnt-alert">0</span></div>
+      <div style="overflow:auto;max-height:240px">
+        <table class="tbl"><thead><tr><th>SKU</th><th>Product</th><th>Qty</th><th>Status</th></tr></thead>
+        <tbody id="tbl-alert"></tbody></table>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-card-header"><h4>SKU Performance</h4><span class="cnt-badge cnt-ok" id="cnt-sku">0</span></div>
+      <div style="overflow:auto;max-height:240px">
+        <table class="tbl"><thead><tr><th>SKU</th><th>Revenue</th><th>Profit</th><th>Margin</th></tr></thead>
+        <tbody id="tbl-sku"></tbody></table>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-card-header"><h4>Recent Invoices</h4></div>
+      <div style="overflow:auto;max-height:240px">
+        <table class="tbl"><thead><tr><th>Invoice</th><th>Date</th><th>Items</th><th>Total</th></tr></thead>
+        <tbody id="tbl-invoices"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RAW DATA -->
+<div class="panel" id="panel-rawdata">
+  <div class="rawdata-tabs">
+    <div class="rawdata-tab active" onclick="switchRawTab('stockout',this)">Stockout Transactions (104)</div>
+    <div class="rawdata-tab" onclick="switchRawTab('products',this)">Product Stock (100 SKU)</div>
+  </div>
+  <div class="rawdata-controls">
+    <input class="search-input" id="raw-search" placeholder="Search..." oninput="renderRawData()">
+    <span style="font-family:var(--mono);font-size:0.72rem;color:var(--muted)" id="raw-count"></span>
+  </div>
+  <div class="rawdata-table-wrap"><table class="tbl"><thead><tr id="raw-thead"></tr></thead><tbody id="raw-tbody"></tbody></table></div>
+  <div class="pagination">
+    <span id="pg-info"></span>
+    <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">← Prev</button>
+    <button class="pg-btn" id="pg-next" onclick="changePage(1)">Next →</button>
+  </div>
+</div>
+
+<!-- SQL EXPLORER -->
+<div class="panel" id="panel-sql">
+  <div class="sql-layout">
+    <div class="sql-sidebar">
+      <div class="sql-sidebar-header">Saved Queries</div>
+      <div class="query-list" id="query-list"></div>
+    </div>
+    <div class="sql-main">
+      <div class="sql-editor-wrap">
+        <div class="sql-editor-header"><span id="sql-lbl">Custom Query</span><button class="btn-run" onclick="runSQL()">▶ Run</button></div>
+        <textarea id="sql-editor" spellcheck="false">SELECT * FROM stockout_transactions LIMIT 10;</textarea>
+      </div>
+      <div class="sql-result-wrap">
+        <div class="sql-result-info"><span id="sql-info">No results</span><span id="sql-time"></span></div>
+        <div style="overflow:auto"><table class="tbl"><thead><tr id="sql-head"></tr></thead><tbody id="sql-rows"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<div class="panel" id="panel-pipeline">
+  <div class="pipeline-grid">
+    <div class="pipeline-card">
+      <h3>Pipeline Stats</h3>
+      <div class="stat-row">
+        <div class="stat-item"><div class="sv" id="ps-tx">—</div><div class="sk">Transactions</div></div>
+        <div class="stat-item"><div class="sv" id="ps-sku">—</div><div class="sk">SKUs</div></div>
+        <div class="stat-item"><div class="sv">2</div><div class="sk">Tables</div></div>
+        <div class="stat-item"><div class="sv" id="ps-runs">—</div><div class="sk">Runs</div></div>
+      </div>
+      <h3 style="margin-top:16px">Last Runs</h3>
+      <div class="run-history" id="run-history"></div>
+    </div>
+    <div class="pipeline-card">
+      <h3>Python Pipeline (pipeline_09.py)</h3>
+      <div class="code-block"><span class="cmt"># Fetches 2 datasets in 1 API call</span>
+payload[<span class="str">"stockout"</span>]  <span class="cmt"># 104 transaction lines</span>
+payload[<span class="str">"products"</span>]  <span class="cmt"># 100 SKU snapshots</span>
+
+<span class="cmt"># Derives margin_per_unit & margin_pct</span>
+margin = value_selling - value_capital
+margin_pct = margin / value_capital * 100
+
+<span class="cmt"># Validates stock consistency</span>
+<span class="kw">if</span> in_stock - out_stock != qty_stock:
+    warnings.append(...)</div>
+    </div>
+    <div class="pipeline-card">
+      <h3>AppScript Export (export.js)</h3>
+      <div class="code-block"><span class="cmt">// Two datasets, one Web App</span>
+<span class="cmt">// Supports ?sheet= parameter</span>
+GET /exec               <span class="cmt">→ both tables</span>
+GET /exec?sheet=stockout <span class="cmt">→ sales only</span>
+GET /exec?sheet=products <span class="cmt">→ stock only</span>
+
+<span class="cmt">// Auto mode: onEdit() + LockService</span>
+<span class="kw">const</span> lock = LockService
+  .getScriptLock();
+lock.waitLock(<span class="str">250</span>); <span class="cmt">// race prevention</span></div>
+    </div>
+    <div class="pipeline-card">
+      <h3>GitHub Actions</h3>
+      <div class="code-block"><span class="cmt"># Scheduled 00:01 WIB daily</span>
+cron: <span class="str">'1 17 * * *'</span>
+
+<span class="cmt"># Or trigger manually:</span>
+workflow_dispatch:
+  inputs:
+    pipeline: pipeline_09
+
+<span class="kw">env</span>:
+  WEBAPP_URL_09: ${{secrets.WEBAPP_URL_09}}</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DB_URL = 'https://raw.githubusercontent.com/USERNAME/portfolio-caraka/main/09-revenue-ops/data/inventory_db.sqlite';
+let db=null, allRawData=[], rawPage=1, currentRawTable='stockout_transactions';
+const RAW_PER_PAGE=50;
+
+const SAVED_QUERIES=[
+  {label:'KPI: Total Revenue & Profit',type:'kpi',sql:`SELECT ROUND(SUM(subtotal),2) AS revenue, ROUND(SUM(margin),2) AS profit, ROUND(SUM(margin)/SUM(subtotal)*100,1) AS margin_pct\nFROM stockout_transactions;`},
+  {label:'KPI: Inventory Value',type:'kpi',sql:`SELECT COUNT(*) AS total_sku, SUM(CASE WHEN is_stockout=0 THEN 1 ELSE 0 END) AS available, SUM(CASE WHEN is_stockout=1 THEN 1 ELSE 0 END) AS stockout, ROUND(SUM(qty_stock*value_capital),2) AS capital_value, ROUND(SUM(qty_stock*value_selling),2) AS selling_value\nFROM product_stock;`},
+  {label:'Chart: Monthly Sales',type:'chart',sql:`SELECT year_month, COUNT(DISTINCT invoice) AS invoices, ROUND(SUM(subtotal),2) AS revenue, ROUND(SUM(margin),2) AS profit\nFROM stockout_transactions WHERE year_month IS NOT NULL\nGROUP BY year_month ORDER BY year_month;`},
+  {label:'Chart: Top Products',type:'chart',sql:`SELECT sku, product_name, ROUND(SUM(subtotal),2) AS revenue, ROUND(SUM(margin),2) AS profit\nFROM stockout_transactions GROUP BY sku ORDER BY revenue DESC LIMIT 10;`},
+  {label:'Chart: Cashier Performance',type:'chart',sql:`SELECT cashier, COUNT(DISTINCT invoice) AS invoices, ROUND(SUM(subtotal),2) AS revenue, ROUND(SUM(margin)/SUM(subtotal)*100,1) AS margin_pct\nFROM stockout_transactions WHERE cashier IS NOT NULL\nGROUP BY cashier ORDER BY revenue DESC;`},
+  {label:'Table: Stock Alert',type:'table',sql:`SELECT sku, product_name, qty_stock, value_capital, value_selling, margin_pct, is_stockout\nFROM product_stock WHERE qty_stock<=10 ORDER BY qty_stock ASC;`},
+  {label:'Table: SKU Performance',type:'table',sql:`SELECT s.sku, s.product_name, ROUND(SUM(s.qty),0) AS qty_sold, ROUND(SUM(s.subtotal),2) AS revenue, ROUND(SUM(s.margin),2) AS profit, ROUND(SUM(s.margin)/SUM(s.subtotal)*100,1) AS margin_pct, p.qty_stock\nFROM stockout_transactions s LEFT JOIN product_stock p ON s.sku=p.sku GROUP BY s.sku ORDER BY revenue DESC;`},
+  {label:'Analytics: Inventory Summary',type:'analytics',sql:`SELECT COUNT(*) AS total_sku, ROUND(SUM(qty_stock*value_capital),2) AS total_capital, ROUND(SUM(qty_stock*value_selling),2) AS total_selling, ROUND(SUM(qty_stock*(value_selling-value_capital)),2) AS potential_profit, SUM(is_stockout) AS stockout_count\nFROM product_stock;`},
+  {label:'Analytics: JOIN Sales+Stock',type:'analytics',sql:`SELECT s.sku, s.product_name, ROUND(SUM(s.subtotal),2) AS sold_revenue, p.qty_stock AS remaining_stock, ROUND(p.qty_stock*p.value_selling,2) AS remaining_value\nFROM stockout_transactions s\nLEFT JOIN product_stock p ON s.sku=p.sku\nGROUP BY s.sku ORDER BY sold_revenue DESC LIMIT 15;`},
+  {label:'Meta: Pipeline Runs',type:'meta',sql:`SELECT * FROM pipeline_runs ORDER BY run_id DESC LIMIT 10;`},
+  {label:'Full: Stockout Transactions',type:'table',sql:`SELECT * FROM stockout_transactions ORDER BY sale_date DESC;`},
+  {label:'Full: Product Stock',type:'table',sql:`SELECT * FROM product_stock ORDER BY qty_stock ASC;`},
+];
+
+async function init(){
+  setMsg('Loading sql.js...');
+  const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}`});
+  setMsg('Fetching database...');
+  let buf;
+  try{const r=await fetch(DB_URL);if(!r.ok)throw new Error();buf=await r.arrayBuffer();}
+  catch{try{const r=await fetch('./data/inventory_db.sqlite');buf=await r.arrayBuffer();}
+  catch{setMsg('⚠ Cannot load database. Check DB_URL.');setTimeout(()=>hide(),3000);return;}}
+  setMsg('Rendering dashboard...');
+  db=new SQL.Database(new Uint8Array(buf));
+  buildQueryList();populateFilters();renderDashboard();renderRawData();renderPipelineInfo();
+  hide();
+}
+function setMsg(m){document.getElementById('loader-msg').textContent=m;}
+function hide(){document.getElementById('loading-screen').style.display='none';}
+
+function showTab(name,e){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  e.currentTarget.classList.add('active');
+}
+
+function switchInner(name,el){
+  document.querySelectorAll('.inner-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.inner-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('inner-'+name).classList.add('active');
+}
+
+function q(sql){if(!db)return[];try{const s=db.prepare(sql);const r=[];while(s.step())r.push(s.getAsObject());s.free();return r;}catch(e){console.error(e.message);return[];}}
+
+function populateFilters(){
+  fillSel('f-cashier',q('SELECT DISTINCT cashier FROM stockout_transactions WHERE cashier IS NOT NULL ORDER BY cashier'),'cashier');
+  fillSel('f-pay',q('SELECT DISTINCT payment_method FROM stockout_transactions WHERE payment_method IS NOT NULL ORDER BY payment_method'),'payment_method');
+}
+function fillSel(id,rows,col){const s=document.getElementById(id);rows.forEach(r=>{const o=document.createElement('option');o.value=o.textContent=r[col];s.appendChild(o);});}
+
+function getF(){return{from:document.getElementById('f-from').value,to:document.getElementById('f-to').value,cashier:document.getElementById('f-cashier').value,pay:document.getElementById('f-pay').value,sku:document.getElementById('f-sku').value.trim(),stock:document.getElementById('f-stock').value};}
+function buildW(f,table='stockout'){
+  const c=[];
+  if(table==='stockout'){
+    if(f.from)c.push(`sale_date>='${f.from}'`);
+    if(f.to)c.push(`sale_date<='${f.to}'`);
+    if(f.cashier!=='ALL')c.push(`cashier='${f.cashier}'`);
+    if(f.pay!=='ALL')c.push(`payment_method='${f.pay}'`);
+    if(f.sku)c.push(`(sku LIKE '%${f.sku}%' OR product_name LIKE '%${f.sku}%')`);
+  } else {
+    if(f.sku)c.push(`(sku LIKE '%${f.sku}%' OR product_name LIKE '%${f.sku}%')`);
+    if(f.stock==='available')c.push('is_stockout=0');
+    else if(f.stock==='stockout')c.push('is_stockout=1');
+    else if(f.stock==='low')c.push('qty_stock<=10');
+  }
+  return c.length?'WHERE '+c.join(' AND '):'';
+}
+function applyFilters(){renderDashboard();}
+function resetFilters(){document.getElementById('f-from').value='';document.getElementById('f-to').value='';document.getElementById('f-sku').value='';['f-cashier','f-pay','f-stock'].forEach(id=>document.getElementById(id).selectedIndex=0);renderDashboard();}
+
+const charts={};
+function renderDashboard(){const f=getF();const ws=buildW(f,'stockout');const wp=buildW(f,'product');renderKPIs(ws,wp);renderCharts(ws);renderTables(ws,wp);}
+
+function set(id,v){document.getElementById(id).textContent=v;}
+function fmt(n){return n!=null?'$'+Number(n).toLocaleString():'—';}
+
+function renderKPIs(ws,wp){
+  const ww=ws?ws+' AND ':'WHERE ';
+  const rev=q(`SELECT ROUND(SUM(subtotal),2) AS r, ROUND(SUM(margin),2) AS p, COUNT(DISTINCT invoice) AS i, ROUND(SUM(qty),0) AS q FROM stockout_transactions ${ws}`)[0]||{};
+  const aov=q(`SELECT ROUND(SUM(subtotal)/COUNT(DISTINCT invoice),2) AS n FROM stockout_transactions ${ws}`)[0]?.n;
+  const marg=q(`SELECT ROUND(SUM(margin)/SUM(subtotal)*100,1) AS n FROM stockout_transactions ${ws} ${ws?'AND':'WHERE'} subtotal>0`)[0]?.n;
+  const active=q(`SELECT COUNT(*) AS n FROM product_stock ${wp} ${wp?'AND':'WHERE'} qty_stock>0`)[0]?.n??'—';
+  const sout=q(`SELECT COUNT(*) AS n FROM product_stock WHERE is_stockout=1`)[0]?.n??'—';
+  set('k-rev',fmt(rev.r));set('k-profit',fmt(rev.p));set('k-inv',rev.i??'—');set('k-qty',rev.q??'—');
+  set('k-aov',fmt(aov));set('k-margin',(marg??'—')+'%');set('k-active',active);set('k-stockout',sout);
+}
+
+function renderCharts(ws){
+  const ww=ws?ws+' AND ':'WHERE ';
+  const mon=q(`SELECT year_month AS m, ROUND(SUM(subtotal),2) AS r, ROUND(SUM(margin),2) AS p FROM stockout_transactions ${ws} ${ws?'AND':'WHERE'} year_month IS NOT NULL GROUP BY m ORDER BY m`);
+  const top=q(`SELECT sku, ROUND(SUM(subtotal),2) AS r FROM stockout_transactions ${ws} GROUP BY sku ORDER BY r DESC LIMIT 8`);
+  const pay=q(`SELECT payment_method AS label, COUNT(DISTINCT invoice) AS n FROM stockout_transactions ${ws} ${ws?'AND':'WHERE'} payment_method IS NOT NULL GROUP BY label ORDER BY n DESC`);
+  const cas=q(`SELECT cashier AS label, ROUND(SUM(subtotal),2) AS n FROM stockout_transactions ${ws} ${ws?'AND':'WHERE'} cashier IS NOT NULL GROUP BY label ORDER BY n DESC`);
+  const P=['#ffd166','#7aff9c','#3dbbff','#ff9f40','#c77dff','#ff6b6b','#4cc9f0','#a8dadc'];
+
+  mkChart('chart-monthly','bar',{labels:mon.map(r=>r.m),datasets:[{label:'Revenue',data:mon.map(r=>r.r),backgroundColor:'#ffd16618',borderColor:'#ffd166',borderWidth:1.5},{label:'Profit',data:mon.map(r=>r.p),backgroundColor:'#7aff9c18',borderColor:'#7aff9c',borderWidth:1.5}]});
+  mkChart('chart-top-products','bar',{labels:top.map(r=>r.sku),datasets:[{label:'Revenue',data:top.map(r=>r.r),backgroundColor:P,borderWidth:0,borderRadius:3}]},true);
+  mkChart('chart-pay','doughnut',{labels:pay.map(r=>r.label),datasets:[{data:pay.map(r=>r.n),backgroundColor:P,borderWidth:0}]});
+  mkChart('chart-cashier','bar',{labels:cas.map(r=>r.label),datasets:[{label:'Revenue',data:cas.map(r=>r.n),backgroundColor:'#ff9f4040',borderColor:'#ff9f40',borderWidth:1.5}]});
+}
+
+function mkChart(id,type,data,horiz=false){
+  if(charts[id])charts[id].destroy();
+  const ctx=document.getElementById(id)?.getContext('2d');
+  if(!ctx)return;
+  charts[id]=new Chart(ctx,{type,data,options:{
+    indexAxis:horiz?'y':'x',
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#b8a870',font:{family:"'DM Mono'",size:10},boxWidth:10}}},
+    scales:type==='bar'?{x:{grid:{color:'#3a2e0040'},ticks:{color:'#806b00',font:{family:"'DM Mono'",size:10}}},y:{grid:{color:'#3a2e0040'},ticks:{color:'#806b00',font:{family:"'DM Mono'",size:10}}}}:{}
+  }});
+}
+
+function renderTables(ws,wp){
+  const alert_=q(`SELECT sku,product_name,qty_stock,is_stockout FROM product_stock ${wp} ${wp?'AND':'WHERE'} qty_stock<=10 ORDER BY qty_stock`);
+  const sku=q(`SELECT s.sku, ROUND(SUM(s.subtotal),2) AS rev, ROUND(SUM(s.margin),2) AS prof, ROUND(SUM(s.margin)/SUM(s.subtotal)*100,1) AS mp FROM stockout_transactions s ${ws} GROUP BY s.sku ORDER BY rev DESC LIMIT 10`);
+  const inv=q(`SELECT invoice, sale_date, COUNT(*) AS items, ROUND(SUM(subtotal),2) AS total FROM stockout_transactions ${ws} GROUP BY invoice ORDER BY sale_date DESC, invoice DESC LIMIT 15`);
+
+  set('cnt-alert',alert_.length);
+  set('cnt-sku',sku.length);
+
+  document.getElementById('tbl-alert').innerHTML=alert_.map(r=>{
+    const pct=r.is_stockout?0:Math.min(100,r.qty_stock/50*100);
+    const cls=r.is_stockout?'crit':r.qty_stock<=5?'warn':'';
+    return`<tr><td>${r.sku}</td><td>${r.product_name||'—'}</td><td>${r.qty_stock}<div class="stock-bar-wrap"><div class="stock-bar-fill ${cls}" style="width:${pct}%"></div></div></td><td><span class="badge ${r.is_stockout?'badge-out':'badge-low'}">${r.is_stockout?'Stockout':'Low'}</span></td></tr>`;
+  }).join('')||'<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--muted)">No stock alerts</td></tr>';
+
+  document.getElementById('tbl-sku').innerHTML=sku.map(r=>`<tr><td>${r.sku}</td><td>${fmt(r.rev)}</td><td>${fmt(r.prof)}</td><td>${r.mp??'—'}%</td></tr>`).join('');
+  document.getElementById('tbl-invoices').innerHTML=inv.map(r=>`<tr><td style="font-family:var(--mono);font-size:0.72rem">${r.invoice}</td><td>${r.sale_date||'—'}</td><td>${r.items}</td><td>${fmt(r.total)}</td></tr>`).join('');
+}
+
+/* RAW DATA */
+let currentRawTab='stockout_transactions';
+function switchRawTab(tbl,el){
+  document.querySelectorAll('.rawdata-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  currentRawTab=tbl==='stockout'?'stockout_transactions':'product_stock';
+  rawPage=1;renderRawData();
+}
+function renderRawData(){if(!db)return;const s=document.getElementById('raw-search').value.toLowerCase();const all=q(`SELECT * FROM ${currentRawTab} ORDER BY rowid DESC`);allRawData=s?all.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(s))):all;rawPage=1;renderRawPage();}
+function renderRawPage(){const total=allRawData.length;const start=(rawPage-1)*RAW_PER_PAGE;const rows=allRawData.slice(start,start+RAW_PER_PAGE);if(!rows.length){document.getElementById('raw-tbody').innerHTML='';return;}const cols=Object.keys(rows[0]).filter(c=>!c.startsWith('_'));document.getElementById('raw-thead').innerHTML=cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('');document.getElementById('raw-tbody').innerHTML=rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`).join('');set('pg-info',`${start+1}–${Math.min(start+RAW_PER_PAGE,total)} of ${total}`);set('raw-count',`${total} records`);document.getElementById('pg-prev').disabled=rawPage<=1;document.getElementById('pg-next').disabled=rawPage>=Math.ceil(total/RAW_PER_PAGE);}
+function changePage(d){rawPage+=d;renderRawPage();}
+
+/* SQL EXPLORER */
+function buildQueryList(){const list=document.getElementById('query-list');list.innerHTML=SAVED_QUERIES.map((q,i)=>`<div class="query-item ${i===0?'active':''}" onclick="loadQuery(${i},this)"><div class="q-label">${q.label}</div><div class="q-type">${q.type}</div></div>`).join('');loadQuery(0,list.querySelector('.query-item'));}
+function loadQuery(i,el){document.querySelectorAll('.query-item').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.getElementById('sql-editor').value=SAVED_QUERIES[i].sql;document.getElementById('sql-lbl').textContent=SAVED_QUERIES[i].label;runSQL();}
+function runSQL(){if(!db)return;const sql=document.getElementById('sql-editor').value.trim();if(!sql)return;const t0=performance.now();try{const s=db.prepare(sql);const rows=[];while(s.step())rows.push(s.getAsObject());s.free();const ms=(performance.now()-t0).toFixed(1);set('sql-info',`${rows.length} rows`);set('sql-time',`${ms}ms`);if(!rows.length){document.getElementById('sql-head').innerHTML='';document.getElementById('sql-rows').innerHTML='<tr><td style="padding:16px;color:var(--muted)">0 rows</td></tr>';return;}const cols=Object.keys(rows[0]);document.getElementById('sql-head').innerHTML=cols.map(c=>`<th>${c}</th>`).join('');document.getElementById('sql-rows').innerHTML=rows.slice(0,200).map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'null'}</td>`).join('')}</tr>`).join('');}catch(e){set('sql-info','Error');document.getElementById('sql-head').innerHTML='';document.getElementById('sql-rows').innerHTML=`<tr><td style="padding:16px;color:var(--danger);font-family:var(--mono)">${e.message}</td></tr>`;}}
+
+/* PIPELINE INFO */
+function renderPipelineInfo(){if(!db)return;const tx=q('SELECT COUNT(*) AS n FROM stockout_transactions')[0]?.n??'—';const sku=q('SELECT COUNT(*) AS n FROM product_stock')[0]?.n??'—';const runs=q('SELECT COUNT(*) AS n FROM pipeline_runs')[0]?.n??'—';const hist=q('SELECT * FROM pipeline_runs ORDER BY run_id DESC LIMIT 6');set('ps-tx',tx);set('ps-sku',sku);set('ps-runs',runs);document.getElementById('run-history').innerHTML=hist.map(r=>`<div class="run-row"><span class="run-status">✓ ${r.run_at?.slice(0,16)||'—'} · ${r.table_name}</span><span class="run-meta">${r.loaded_total} loaded · ${r.warnings} warn</span></div>`).join('')||'<div class="run-row"><span class="run-meta">No runs yet</span></div>';}
+
+init();
+</script>
+</body>
+</html>
